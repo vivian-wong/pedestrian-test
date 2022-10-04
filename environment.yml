@@ -1,0 +1,15 @@
+name: pedestrian-test
+channels:
+    - conda-forge
+    - defaults
+dependencies: 
+    - pandas
+    - pip: 
+        - ipykernel
+        - jupyterlab
+        - ipywidgets
+        - pytorch-lightning
+        - lightning-bolts
+        - opencv-python
+        - matplotlib
+        - torchvision
