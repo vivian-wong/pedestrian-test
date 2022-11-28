@@ -4,6 +4,7 @@ channels:
     - defaults
 dependencies: 
     - pandas
+    - scipy
     - pip: 
         - ipykernel
         - jupyterlab
@@ -13,3 +14,4 @@ dependencies:
         - opencv-python
         - matplotlib
         - torchvision
+        - utm
