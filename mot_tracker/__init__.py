@@ -1,7 +1,7 @@
 from .deep_sort import DeepSort
 
 
-__all__ = ['DeepSort', 'build_tracker']
+__all__ = ['Sort', 'DeepSort', 'build_tracker']
 
 
 def build_tracker(cfg, use_cuda):

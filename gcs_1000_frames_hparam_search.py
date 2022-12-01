@@ -2,28 +2,30 @@ import pandas as pd
 import numpy as np
 import pytorch_lightning as pl
 import matplotlib.pyplot as plt
-import cv2, os, torch, math, torchvision, datetime
-from pl_bolts.models.detection import YOLO, YOLOConfiguration, FasterRCNN
-from tqdm import tqdm 
+import cv2, glob, os, torch, math, torchvision, datetime
+from pl_bolts.models.detection import YOLO, YOLOConfiguration
+from tqdm.notebook import tqdm 
 import utm
 
 # my files
-from deep_sort.deep_sort import DeepSort
+from mot_tracker.deep_sort import DeepSort
+from mot_tracker.naive_sort import Sort
+import draw_utils, transform_utils
 from trajectory_extractor import TrajectoryExtractor
 
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(device)
 
-    for detector_name in ['YOLO', 'FasterRCNN']:
-        for conf_thres in [0.01, 0.5, 0.9]: 
+    for detector_name in ['YOLO']:
+        for conf_thres in [0.9]: #0.01, 0.5, 0.9
             for max_cos_dist in [0.05, 0.1, 0.2, 0.5]: 
                 for max_iou_dist in [0.1, 0.3, 0.5, 0.7, 0.9, 0.99, 1]: 
                     for max_age in [1,3,5,7]:
                         #### args ###
                         class TrajectoryExtractorArgs: 
                             detector_name = detector_name
-                            tracker_name = 'DeepSORT'
+                            tracker_name = 'SORT'
 
                             unique_suffix = str(datetime.datetime.now().date()) + '_' + str(datetime.datetime.now().time()).replace(':', '.')
                         #     input_video_path = "videos/Stadium/00084.wmv"
@@ -38,7 +40,8 @@ if __name__ == "__main__":
                                 os.makedirs(output_txt_folder+'/data')
                             output_txt_path = output_txt_folder+'/data/seq-01.txt'
                             args_save_txt_path = output_txt_folder+'/args.txt'
-                            output_video_path = os.path.split(input_video_path)[0]+"/out/{}.avi".format(unique_suffix)
+#                             output_video_path = os.path.split(input_video_path)[0]+"/out/{}.avi".format(unique_suffix)
+                            output_video_path = "../../media/vivian/ExFAT-2TB/GCS/out/{}.avi".format(unique_suffix)
 
                         #     yolo_config_path = "yolo/yolov4-tiny-3l.cfg"
                         #     yolo_pre_weights_path = "yolo/yolov4-tiny.weights"
@@ -109,8 +112,12 @@ if __name__ == "__main__":
                             )
 
                         elif args.tracker_name == 'SORT': 
-                            # TODO
-                            pass
+                            # set up sort
+                            extractor.load_tracker(
+                                Sort(max_age=args.max_age, 
+                                     min_hits=3,
+                                     iou_threshold = 1- args.max_iou_dist)
+                            )
 
                         detector_out_df, tracker_out_df, txt_df = extractor.detect_all(
                             max_frames=1000,

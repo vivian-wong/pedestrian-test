@@ -172,6 +172,7 @@ class TrajectoryExtractor:
                      detector_outputs['bbox_yc'], 
                      detector_outputs['bbox_w'], 
                      detector_outputs['bbox_h'])))
+        
         outputs = self.tracker.update(bbox_xywh, detector_outputs['confidence'], frame, detector_outputs['cls_id'])
 #         outputs = self.tracker.update(bbox_xywh, [1]*len(detector_outputs['confidence']), frame, detector_outputs['cls_id'])
 #         print('DEEPSORT', output)
