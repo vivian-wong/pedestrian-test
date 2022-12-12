@@ -17,8 +17,8 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(device)
 
-    for detector_name in ['YOLO']:
-        for conf_thres in [0.9]: #0.01, 0.5, 0.9
+    for detector_name in ['FasterRCNN']:
+        for conf_thres in [0.01, 0.5, 0.9]: 
             for max_cos_dist in [0.05, 0.1, 0.2, 0.5]: 
                 for max_iou_dist in [0.1, 0.3, 0.5, 0.7, 0.9, 0.99, 1]: 
                     for max_age in [1,3,5,7]:
