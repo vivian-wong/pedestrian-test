@@ -1,0 +1,3 @@
+batch_size: 512
+lr: 0.017
+shuffle: true

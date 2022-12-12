@@ -1,0 +1,30 @@
+name: flow_predict
+dependencies: 
+- python=3.6
+- pillow
+- notebook
+- numba
+- ipywidgets
+- nomkl
+- cudatoolkit=10.2
+- pip: 
+  - torch==1.8.1
+  - torchvision
+  - matplotlib
+  - numpy
+  - pandas
+  - tqdm
+  - imgaug>=0.4
+  - torchsummary
+  - scikit-learn
+  - scikit-learn-extra
+  - opencv-python
+  - pandas
+  - seaborn
+  - cython
+  - jupyter
+  - tensorboard
+  - tensorboardX
+  - dgl_cu102==0.6.1
+  - dgl==0.6.1
+  - pytorch-lightning
