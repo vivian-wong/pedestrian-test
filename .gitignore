@@ -2,3 +2,4 @@ videos/
 TrackEval/data/
 .ipynb_checkpoints/
 flow_predict/dataset/
+flow_predict/lightning_logs
