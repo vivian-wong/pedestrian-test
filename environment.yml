@@ -16,3 +16,5 @@ dependencies:
         - torchvision
         - utm
         - filterpy
+        - seaborn
+        - torch-geometric-temporal

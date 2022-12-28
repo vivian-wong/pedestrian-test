@@ -1,3 +1,4 @@
+'''deprecated. used to test on mot challenge dataset'''
 import pandas as pd 
 import numpy as np
 import pytorch_lightning as pl

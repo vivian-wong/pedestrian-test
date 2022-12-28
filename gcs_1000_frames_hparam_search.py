@@ -8,8 +8,8 @@ from tqdm.notebook import tqdm
 import utm
 
 # my files
-from mot_tracker.deep_sort import DeepSort
-from mot_tracker.naive_sort import Sort
+from pedestrian_tracker.deep_sort import DeepSort
+from pedestrian_tracker.naive_sort import Sort
 import draw_utils, transform_utils
 from trajectory_extractor import TrajectoryExtractor
 
@@ -32,7 +32,6 @@ if __name__ == "__main__":
                         #     input_video_path = "videos/Y2E2/Y2E2_West.MOV"
                         #     input_video_path = "videos/GCS/grandcentral.avi" # cannot use because no gt. fml.
                             input_video_path = "videos/GCS/slideshow.avi" # Use this for paper YOLO. 
-                        #     input_video_path = "videos/GCS/slideshow_small.avi" # Use this for paper FRCNN. 
 
                             output_txt_folder = 'TrackEval/data/trackers/mot_challenge/GCS-val/{}_{}_{}'.format(detector_name, tracker_name, unique_suffix)
                             if not os.path.exists(output_txt_folder):
@@ -41,14 +40,14 @@ if __name__ == "__main__":
                             output_txt_path = output_txt_folder+'/data/seq-01.txt'
                             args_save_txt_path = output_txt_folder+'/args.txt'
 #                             output_video_path = os.path.split(input_video_path)[0]+"/out/{}.avi".format(unique_suffix)
-                            output_video_path = "../../media/vivian/ExFAT-2TB/GCS/out/{}.avi".format(unique_suffix)
+                            output_video_path = "../../../media/vivian/ExFAT-2TB/GCS/out/{}.avi".format(unique_suffix)
 
                         #     yolo_config_path = "yolo/yolov4-tiny-3l.cfg"
                         #     yolo_pre_weights_path = "yolo/yolov4-tiny.weights"
-                            yolo_config_path = "yolo/yolov7-tiny.cfg"
-                            yolo_pre_weights_path = "yolo/yolov7-tiny.weights"
+                            yolo_config_path = "pedestrian_detector/yolo/yolov7-tiny.cfg"
+                            yolo_pre_weights_path = "pedestrian_detector/yolo/yolov7-tiny.weights"
 
-                            deepsort_parameters_path = "deep_sort/deep/checkpoint/ckpt.t7"
+                            deepsort_parameters_path = "pedestrian_tracker/deep/checkpoint/ckpt.t7"
                             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
                             confidence_threshold = conf_thres
