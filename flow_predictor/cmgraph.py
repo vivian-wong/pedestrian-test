@@ -85,6 +85,7 @@ def parse_gcs(path):
     raw_data_frame = tempdf.reset_index()
     
     # world coordinate
+    raw_data_frame[["img_x","img_y"]] = raw_data_frame[["pos_x","pos_y"]] # store original image coordinates 
     world_coords = image_to_world(raw_data_frame[["pos_x", "pos_y"]].to_numpy(), HOMOG)
     raw_data_frame[["pos_x", "pos_y"]] = pd.DataFrame(world_coords)
     raw_data_frame["timestamp"] = raw_data_frame["frame_id"] / FPS
@@ -112,7 +113,6 @@ def parse_gcs(path):
     
     trajs = [g for _, g in raw_df_groupby]
     return trajs
-
 
 class GCSDatasetLoaderStatic(): 
     '''
@@ -248,6 +248,143 @@ class GCSDatasetLoaderStatic():
         )
         return dataset
 
+class StadiumDatasetLoaderStatic(): 
+    '''
+    Create a static graph temporal signal of people at GCS
+    - nodes: each node is a floor plan-based zone / room. 
+    - node feature = avg speed, time. 
+    - edges: unweighted. 1 = two connected zones (include diagonal). 
+    '''
+    def __init__(self, 
+                 trajs,
+                 ZONE_LIST):
+        super(StadiumDatasetLoaderStatic, self).__init__()
+        self.trajs = trajs
+        self.ZONE_LIST = ZONE_LIST
+        self._read_data()
+        
+    def _read_data(self): 
+        delta_t = self.trajs[0]['timestamp'].iloc[1]-self.trajs[0]['timestamp'].iloc[0]
+#         assert delta_t == 0.8
+        all_trajs = pd.concat(self.trajs)
+        all_trajs['speed'] = np.sqrt(all_trajs['vel_x']**2 + all_trajs['vel_y']**2)
+        self.all_trajs = all_trajs 
+        
+        num_nodes = len(self.ZONE_LIST)
+        # todo: do connections automatically
+        A = np.array([
+            [0,1,0,0,0],
+            [1,0,1,0,0],
+            [0,1,0,1,1],
+            [0,0,1,0,0],
+            [0,0,1,0,0]])
+        assert A.shape ==(num_nodes, num_nodes)
+        A = np.triu(A)
+        A = A + A.T - np.diag(np.diag(A))
+        
+        # group by zones, each having a time vs speed df.
+        zone_dfs = []
+        common_time = [0, 1e6]
+        for i in range(num_nodes): 
+            x1, y1, x2, y2 = self.ZONE_LIST[i]
+            tr = self.all_trajs[
+                 (self.all_trajs['pos_x'] > x1) & 
+                 (self.all_trajs['pos_x'] < x2) & 
+                 (self.all_trajs['pos_y'] > y1) & 
+                 (self.all_trajs['pos_y'] < y2)
+                ]
+            tr = tr.sort_values(by=['timestamp'])
+#             # resample mean over 1 sec.
+#             tr['time'] = pd.to_datetime(tr["timestamp"], unit='s')
+#             tr.set_index('time').resample('1S')['vel_x'].mean().reset_index()
+#             delta_t = 1
+            
+            temp_df = pd.DataFrame(columns=["timestamp", "speed", "num_people"])
+            groupby = tr.groupby("timestamp", as_index=False)
+            for _,g in groupby: 
+                mean_speed = g['speed'].mean()
+                num_people = g['agent_id'].nunique()
+                timestamp = g['timestamp'].min()
+                temp_df = temp_df.append(pd.DataFrame({"timestamp": [timestamp],
+                                                       "speed": [mean_speed],
+                                                       "num_people": [num_people]
+                                                      }))
+            tr = temp_df
+            interp_t = np.arange(tr["timestamp"].iloc[0], tr["timestamp"].iloc[-1], delta_t)
+            interp_func = interpolate.interp1d(tr["timestamp"], tr["speed"], kind='linear')
+            interp_X_ = interp_func(interp_t)
+            interp_func = interpolate.interp1d(tr["timestamp"], tr["num_people"], kind='linear')
+            interp_Y_ = interp_func(interp_t)
+            zone_dfs.append(pd.DataFrame({"timestamp": interp_t,
+                                          "speed": interp_X_,
+                                          "num_people": interp_Y_}))
+            common_time[0] = max(common_time[0], interp_t.min())
+            common_time[1] = min(common_time[1], interp_t.max())
+            
+        # crop out beginning and end with incomplete data
+        for i, df in enumerate(zone_dfs):
+            df = df.round({'timestamp':1})
+            temp_df = df[(common_time[0] <= df['timestamp']) & 
+                         (df['timestamp'] <= common_time[1])].copy()
+            temp_df['time'] = (temp_df['timestamp'] - common_time[0])/(common_time[1]- common_time[0])
+            zone_dfs[i] = temp_df[['num_people','time','speed']].to_numpy().transpose([1,0])
+        X = np.stack(zone_dfs)
+        X = X.astype(np.float32)
+        
+        # Normalise as in DCRNN paper (via Z-Score Method)
+        means = np.mean(X, axis=(0, 2))
+        X = X - means.reshape(1, -1, 1)
+        stds = np.std(X, axis=(0, 2))
+        X = X / stds.reshape(1, -1, 1)
+
+        self.A = torch.from_numpy(A)
+        self.X = torch.from_numpy(X)
+
+    def _get_edges_and_weights(self):
+        edge_indices, values = dense_to_sparse(self.A)
+        edge_indices = edge_indices.numpy()
+        values = values.numpy()
+        self.edges = edge_indices
+        self.edge_weights = values
+
+
+    def _generate_task(self, num_timesteps_in, num_timesteps_out):
+        """Uses the node features of the graph and generates a feature/target
+        relationship of the shape
+        (num_nodes, num_node_features, num_timesteps_in) -> (num_nodes, num_timesteps_out)
+        predicting the average traffic speed using num_timesteps_in to predict the
+        traffic conditions in the next num_timesteps_out
+
+        Args:
+            num_timesteps_in (int): number of timesteps the sequence model sees
+            num_timesteps_out (int): number of timesteps the sequence model has to predict
+        """
+        indices = [
+            (i, i + (num_timesteps_in + num_timesteps_out))
+            for i in range(self.X.shape[2] - (num_timesteps_in + num_timesteps_out) + 1)
+        ]
+
+        # Generate observations
+        features, target = [], []
+        for i, j in indices:
+            features.append((self.X[:, :, i : i + num_timesteps_in]).numpy())
+            target.append((self.X[:, 0, i + num_timesteps_in : j]).numpy())
+
+        self.features = features
+        self.targets = target
+        
+    def get_dataset(self, 
+                    num_timesteps_in = 10, 
+                    num_timesteps_out= 10): 
+        '''10 step * 0.8 sec/step = 8 sec. '''
+        self._get_edges_and_weights()
+        self._generate_task(num_timesteps_in, num_timesteps_out)
+        dataset = StaticGraphTemporalSignal(
+            self.edges, self.edge_weights, self.features, self.targets
+        )
+        return dataset
+    
+    
 # # Lightning Batch
 
 class BatchLitDataModule(pl.LightningDataModule):
